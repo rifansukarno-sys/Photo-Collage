@@ -1,0 +1,58 @@
+name: Photo Collage Maintenance
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate HTML and JavaScript structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          grep -q 'const MAX=25' index.html
+          grep -q 'id="files"' index.html
+          grep -q 'id="camera"' index.html
+          grep -q 'id="png"' index.html
+          grep -q 'id="jpg"' index.html
+          grep -q 'id="reset"' index.html
+          grep -q 'function draw' index.html
+          grep -q 'function download' index.html
+          grep -q 'function add' index.html
+          grep -q 'function remove' index.html
+          grep -q 'function move' index.html
+          grep -q 'function rows' index.html
+          grep -q 'heic2any' index.html
+          ! grep -q 'my-learning-os' index.html
+      - name: JavaScript syntax check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S)
+          if not blocks:
+              raise SystemExit('No inline JavaScript found')
+          Path('/tmp/app.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+          node --check /tmp/app.js
+      - name: Security and scope smoke checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R "rifansukarno-sys/my-learning-os" -n . --exclude-dir=.git
+          ! grep -R "fetch(.*http" -n index.html || true
+          test -f AGENTS.md
