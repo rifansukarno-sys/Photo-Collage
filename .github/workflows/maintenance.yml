@@ -49,10 +49,27 @@ jobs:
           Path('/tmp/app.js').write_text('\n'.join(blocks),encoding='utf-8')
           PY
           node --check /tmp/app.js
+      - name: Pointer interaction regression guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'function hitCell' index.html
+          grep -q 'function dragMove' index.html
+          grep -q 'E.canvas.addEventListener('\''pointerdown'\''' index.html
+          if grep -q 'row:0' index.html; then
+            echo 'Regression: pointer drag hard-codes row:0.'
+            exit 1
+          fi
       - name: Security and scope smoke checks
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -R "rifansukarno-sys/my-learning-os" -n . --exclude-dir=.git
-          ! grep -R "fetch(.*http" -n index.html || true
+          if grep -R "rifansukarno-sys/my-learning-os" -n . --exclude-dir=.git; then
+            echo 'Out-of-scope repository reference detected.'
+            exit 1
+          fi
+          if grep -E 'fetch\("https?://' -n index.html; then
+            echo 'Unexpected remote image/data fetch detected.'
+            exit 1
+          fi
           test -f AGENTS.md
